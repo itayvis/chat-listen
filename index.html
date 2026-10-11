@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1320">
+<title>Chat & Listen</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+  :root{
+    --bg:#0f1320; --surface:#181d2c; --surface2:#20263a; --line:rgba(255,255,255,.08);
+    --text:#eef1f8; --muted:#97a2bd; --accent:#4f7cff; --accent2:#6b91ff; --hl:#f4cb57; --warn:#ffb86b;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;background:var(--bg);color:var(--text);
+    font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+  button,textarea,input{font:inherit;color:inherit}
+  button{cursor:pointer}
+  .app{max-width:720px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;
+    padding:env(safe-area-inset-top) 16px 0}
+  header{display:flex;align-items:center;gap:10px;padding:14px 0 10px}
+  header img{width:32px;height:32px;border-radius:9px}
+  header h1{font-size:18px;margin:0;font-weight:650;flex:1}
+  .chip{direction:ltr;border:0;background:var(--surface2);border-radius:999px;padding:7px 13px;
+    font-size:14px;font-weight:600;font-variant-numeric:tabular-nums}
+  .hidden{display:none !important}
+
+  /* compose */
+  .compose{display:flex;flex-direction:column;gap:12px;padding-bottom:24px}
+  .paste{display:flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:16px;
+    background:var(--accent);color:#fff;font-size:17px;font-weight:600;padding:16px}
+  .paste:active{background:var(--accent2)}
+  textarea{width:100%;min-height:180px;resize:vertical;background:var(--surface);border:1px solid var(--line);
+    border-radius:16px;padding:14px;line-height:1.7;outline:none}
+  textarea:focus{border-color:rgba(79,124,255,.6)}
+  .row{display:flex;gap:10px}
+  .btn{flex:1;border:0;border-radius:14px;padding:13px;font-weight:600;background:var(--surface2)}
+  .btn.primary{background:var(--accent);color:#fff}
+  .tip{font-size:13.5px;color:var(--muted);background:var(--surface);border-radius:14px;padding:12px 14px;margin:0}
+  .tip b{color:var(--text);font-weight:600}
+  h2.section{font-size:13px;color:var(--muted);font-weight:500;margin:8px 2px 0}
+  .recent{display:flex;flex-direction:column;gap:8px}
+  .recent button{display:block;width:100%;text-align:right;border:0;background:var(--surface);border-radius:12px;
+    padding:11px 14px;color:var(--text);font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+  /* reader */
+  .reader{flex:1;padding-bottom:180px}
+  .readtext{font-size:20px;line-height:1.9;white-space:pre-wrap;overflow-wrap:anywhere;padding:6px 2px 0}
+  .w{border-radius:5px;transition:background .08s}
+  .w.on{background:var(--hl);color:#14161d;box-shadow:0 0 0 2px var(--hl)}
+  .w.done{color:#c8cfdf}
+
+  /* player */
+  .player{position:fixed;left:0;right:0;bottom:0;padding:12px 16px calc(14px + env(safe-area-inset-bottom));
+    background:rgba(15,19,32,.92);backdrop-filter:blur(12px);border-top:1px solid var(--line)}
+  .player .inner{max-width:720px;margin:0 auto}
+  .progress{height:4px;background:var(--surface2);border-radius:4px;overflow:hidden;margin-bottom:12px}
+  .progress i{display:block;height:100%;width:0;background:var(--accent);transition:width .2s}
+  .controls{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .round{display:grid;place-items:center;width:46px;height:46px;border-radius:50%;border:0;background:var(--surface2)}
+  .big{width:64px;height:64px;background:var(--accent);color:#fff}
+  .big:active{background:var(--accent2)}
+  .lang{display:flex;align-items:center;gap:6px;direction:ltr;font-size:13px;color:#9fb4ff;
+    background:rgba(79,124,255,.14);border-radius:999px;padding:7px 12px;min-width:88px;justify-content:center}
+  .lang.warn{color:var(--warn);background:rgba(255,184,107,.14)}
+  .eq{display:flex;align-items:flex-end;gap:2px;height:11px}
+  .eq i{display:block;width:2px;height:4px;border-radius:1px;background:currentColor}
+  .playing .eq i{animation:eq .9s ease-in-out infinite}
+  .playing .eq i:nth-child(2){animation-delay:.15s}
+  .playing .eq i:nth-child(3){animation-delay:.3s}
+  @keyframes eq{0%,100%{height:3px}50%{height:11px}}
+
+  /* sheets */
+  .scrim{position:fixed;inset:0;background:rgba(5,7,14,.55);display:flex;align-items:flex-end;justify-content:center;z-index:10}
+  .sheet{width:100%;max-width:720px;background:var(--surface);border-radius:22px 22px 0 0;
+    padding:18px 18px calc(22px + env(safe-area-inset-bottom));border-top:1px solid var(--line)}
+  .sheet .handle{width:40px;height:4px;border-radius:4px;background:#3a4256;margin:0 auto 14px}
+  .sheet h3{margin:0 0 4px;font-size:17px}
+  .sheet p{margin:0;color:var(--muted);font-size:14px}
+  .val{direction:ltr;font-size:30px;font-weight:700;font-variant-numeric:tabular-nums}
+  .speedrow{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px}
+  input[type=range]{width:100%;accent-color:var(--accent);direction:ltr;height:28px}
+  .ticks{position:relative;height:14px;direction:ltr;font-size:11px;color:#6c7792;margin:0 10px}
+  .ticks span{position:absolute;transform:translateX(-50%)}
+  .passage{font-size:18px;line-height:1.85;margin:14px 0;max-height:52vh;overflow:auto}
+  .result{font-size:38px;font-weight:700;margin:10px 0 2px}
+  .timer{direction:ltr;text-align:left;font-size:12px;color:#7f8aa6;font-variant-numeric:tabular-nums}
+  .sheet .row{margin-top:16px}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <img src="icon-192.png" alt="">
+    <h1>Chat & Listen</h1>
+    <button id="speedChip" class="chip" aria-label="מהירות">1×</button>
+  </header>
+
+  <!-- compose -->
+  <section id="compose" class="compose">
+    <button id="pasteBtn" class="paste">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="3" width="8" height="4" rx="1"/><path d="M16 5h2a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h2"/></svg>
+      הדבק והקרא
+    </button>
+    <textarea id="input" placeholder="או הדבק / כתוב כאן טקסט..."></textarea>
+    <div class="row">
+      <button id="readBtn" class="btn primary">הקרא</button>
+      <button id="clearBtn" class="btn">נקה</button>
+    </div>
+    <p class="tip">מ-ChatGPT: לחיצה ארוכה על התשובה ← <b>שתף</b> ← <b>Listen</b>. או לחץ <b>העתק</b> ואז <b>הדבק והקרא</b>.</p>
+    <h2 id="recentTitle" class="section hidden">אחרונים</h2>
+    <div id="recent" class="recent"></div>
+  </section>
+
+  <!-- reader -->
+  <section id="reader" class="reader hidden">
+    <div id="readtext" class="readtext"></div>
+  </section>
+</div>
+
+<!-- player -->
+<div id="player" class="player hidden">
+  <div class="inner">
+    <div class="progress"><i id="bar"></i></div>
+    <div class="controls">
+      <button id="backBtn" class="round" aria-label="חזרה">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+      </button>
+      <span id="langbox" class="lang"><span class="eq"><i></i><i></i><i></i></span><span id="langText">Hebrew</span></span>
+      <button id="playBtn" class="round big" aria-label="נגן"></button>
+      <button id="restartBtn" class="round" aria-label="מההתחלה">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+      </button>
+      <button id="speedChip2" class="chip">1×</button>
+    </div>
+  </div>
+</div>
+
+<!-- speed sheet -->
+<div id="speedSheet" class="scrim hidden">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div class="speedrow"><h3>מהירות הקראה</h3><span id="rateVal" class="val">1×</span></div>
+    <input id="rate" type="range" min="0.5" max="4" step="0.1">
+    <div id="ticks" class="ticks"></div>
+    <p id="readerInfo" style="margin-top:14px"></p>
+    <div class="row"><button id="measureBtn" class="btn primary">מדוד את מהירות הקריאה שלי</button></div>
+  </div>
+</div>
+
+<!-- reading test -->
+<div id="testSheet" class="scrim hidden">
+  <div class="sheet">
+    <div class="handle"></div>
+    <div id="tIntro">
+      <h3>מדידת מהירות קריאה</h3>
+      <p>יופיע קטע קצר. קרא אותו בשקט, בקצב הרגיל שלך. כשתסיים, לחץ "סיימתי".</p>
+      <div class="row"><button id="tStart" class="btn primary">התחל</button><button class="btn" data-close>ביטול</button></div>
+    </div>
+    <div id="tRead" class="hidden">
+      <div id="tTimer" class="timer">0:00</div>
+      <div id="tPassage" class="passage"></div>
+      <div class="row"><button id="tDone" class="btn primary">סיימתי</button><button class="btn" data-close>ביטול</button></div>
+    </div>
+    <div id="tResult" class="hidden">
+      <h3>התוצאה שלך</h3>
+      <div id="tWpm" class="result"></div>
+      <p id="tText"></p>
+      <div class="row"><button id="tApply" class="btn primary">החל מהירות</button><button id="tRetry" class="btn">נסה שוב</button></div>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const RATE_MIN = 0.5, RATE_MAX = 4, CHUNK_MAX = 280;
+  const DEFAULT_BASE = { he: 150, en: 170 };   // words per minute at 1×, learned over time
+  const ICON_PLAY = '<svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.5-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z"/></svg>';
+  const ICON_PAUSE = '<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1.2"/><rect x="14" y="5" width="4" height="14" rx="1.2"/></svg>';
+
+  // ---------- storage (best effort) ----------
+  const store = {
+    get(k, d) { try { const v = JSON.parse(localStorage.getItem("cl-" + k)); return v ?? d; } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("cl-" + k, JSON.stringify(v)); } catch {} }
+  };
+  const settings = {
+    rate: store.get("rate", 1),
+    base: Object.assign({ ...DEFAULT_BASE }, store.get("base", {})),
+    readerWpm: store.get("readerWpm", null)
+  };
+  let recent = store.get("recent", []);
+  const save = () => { store.set("rate", settings.rate); store.set("base", settings.base); store.set("readerWpm", settings.readerWpm); };
+  const clampRate = r => Math.round(Math.min(RATE_MAX, Math.max(RATE_MIN, r)) * 10) / 10;
+  const fmt = r => (Math.round(r * 10) / 10) + "×";
+  const countWords = t => (t.trim().match(/\S+/g) || []).length;
+
+  // ---------- voices ----------
+  let voices = [];
+  const loadVoices = () => { voices = speechSynthesis.getVoices(); };
+  if ("speechSynthesis" in window) { loadVoices(); speechSynthesis.onvoiceschanged = loadVoices; }
+  const detectLang = t => ((t.match(/[֐-׿]/g) || []).length > (t.match(/[A-Za-z]/g) || []).length ? "he" : "en");
+  function pickVoice(lang) {
+    const m = voices.filter(v => { const l = v.lang.toLowerCase().replace("_", "-"); return l.startsWith(lang) || (lang === "he" && l.startsWith("iw")); });
+    return m.find(v => /natural|neural|enhanced/i.test(v.name)) || m.find(v => v.localService) || m[0] || null;
+  }
+
+  // ---------- text cleanup (ChatGPT shares markdown) ----------
+  function clean(t) {
+    return t
+      .replace(/\r/g, "")
+      .replace(/```[\s\S]*?```/g, "")            // code blocks are not read
+      .replace(/^#{1,6}\s*/gm, "")
+      .replace(/\*\*|__|`/g, "")
+      .replace(/^\s*[-*+]\s+/gm, "• ")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  // ---------- reader view ----------
+  let doc = null;   // { text, lang, words:[{start,end,el}] }
+  function buildReader(text) {
+    const box = $("readtext");
+    box.replaceChildren();
+    const words = [];
+    const re = /\S+|\s+/g; let m;
+    while ((m = re.exec(text))) {
+      if (/^\s+$/.test(m[0])) { box.append(m[0]); continue; }
+      const el = document.createElement("span");
+      el.className = "w"; el.textContent = m[0]; el.dataset.i = words.length;
+      box.append(el);
+      words.push({ start: m.index, end: m.index + m[0].length, el });
+    }
+    doc = { text, lang: detectLang(text), words, cur: -1 };
+  }
+  function wordAt(index) {
+    const w = doc.words; let lo = 0, hi = w.length - 1, ans = 0;
+    while (lo <= hi) { const mid = (lo + hi) >> 1; if (w[mid].start <= index) { ans = mid; lo = mid + 1; } else hi = mid - 1; }
+    return ans;
+  }
+  function mark(i) {
+    if (!doc || i === doc.cur || i < 0 || i >= doc.words.length) return;
+    if (doc.cur >= 0) doc.words[doc.cur].el.classList.remove("on");
+    for (let k = Math.max(0, doc.cur); k < i; k++) doc.words[k].el.classList.add("done");
+    doc.cur = i;
+    const el = doc.words[i].el;
+    el.classList.add("on");
+    $("bar").style.width = ((i + 1) / doc.words.length * 100) + "%";
+    const r = el.getBoundingClientRect();
+    if (r.bottom > innerHeight - 190 || r.top < 70) el.scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+  function resetMarks() {
+    doc.words.forEach(w => w.el.classList.remove("on", "done"));
+    doc.cur = -1; $("bar").style.width = "0";
+  }
+  $("readtext").addEventListener("click", e => {
+    const w = e.target.closest(".w");
+    if (w && doc) { const i = +w.dataset.i; resetMarks(); for (let k = 0; k < i; k++) doc.words[k].el.classList.add("done"); play(doc.words[i].start); }
+  });
+
+  // ---------- speaking ----------
+  let session = null;
+  let wakeLock = null;
+  async function keepAwake(on) {
+    try {
+      if (on && !wakeLock && navigator.wakeLock) wakeLock = await navigator.wakeLock.request("screen");
+      if (!on && wakeLock) { await wakeLock.release(); wakeLock = null; }
+    } catch {}
+  }
+
+  function chunks(text, from) {
+    const out = []; let off = from;
+    while (off < text.length) {
+      let end = Math.min(off + CHUNK_MAX, text.length);
+      if (end < text.length) {
+        const s = text.slice(off, end);
+        const cut = Math.max(s.lastIndexOf("\n"), s.lastIndexOf(". "), s.lastIndexOf("? "), s.lastIndexOf("! "), s.lastIndexOf(", "));
+        if (cut > CHUNK_MAX / 3) end = off + cut + 1;
+        else { const sp = s.lastIndexOf(" "); if (sp > 0) end = off + sp + 1; }
+      }
+      const piece = text.slice(off, end);
+      if (piece.trim()) out.push({ text: piece, offset: off });
+      off = end;
+    }
+    return out;
+  }
+
+  function learnBase(lang, words, ms, rate) {
+    if (words < 6 || ms < 1500) return;
+    const wpm1 = words / (ms / 60000) / rate;
+    if (!isFinite(wpm1) || wpm1 < 40 || wpm1 > 600) return;
+    settings.base[lang] = Math.round((settings.base[lang] || DEFAULT_BASE[lang]) * 0.6 + wpm1 * 0.4);
+    save();
+  }
+
+  function setPlayingUI(on) {
+    $("playBtn").innerHTML = on ? ICON_PAUSE : ICON_PLAY;
+    $("player").classList.toggle("playing", on);
+  }
+
+  function stopSpeech() {
+    if (session) { clearInterval(session.timer); clearTimeout(session.fallback); }
+    session = null;
+    if ("speechSynthesis" in window) speechSynthesis.cancel();
+    setPlayingUI(false);
+    keepAwake(false);
+  }
+
+  // Pause = stop and remember the word (Android's pause is unreliable).
+  function pause() {
+    if (!session) return;
+    const at = session.last;
+    stopSpeech();
+    doc.resumeAt = at;
+  }
+
+  function play(from = 0) {
+    if (!doc) return;
+    if (!("speechSynthesis" in window)) { setLang("No speech", true); return; }
+    stopSpeech();
+    doc.resumeAt = null;
+    if (from > 0 && doc.words.length) from = doc.words[wordAt(from)].start;   // always restart at a word's start
+    const lang = doc.lang, voice = pickVoice(lang);
+    if (!voice && lang === "he") setLang("No Hebrew voice", true); else setLang(lang === "he" ? "Hebrew" : "English");
+    const me = { pieces: chunks(doc.text, from), i: 0, last: from, timer: 0, fallback: 0 };
+    session = me;
+    setPlayingUI(true);
+    keepAwake(true);
+
+    const next = () => {
+      if (session !== me) return;
+      clearInterval(me.timer); clearTimeout(me.fallback);
+      const piece = me.pieces[me.i++];
+      if (!piece) { stopSpeech(); finish(); return; }
+      const u = new SpeechSynthesisUtterance(piece.text);
+      if (voice) { u.voice = voice; u.lang = voice.lang; } else u.lang = lang === "he" ? "he-IL" : "en-US";
+      u.rate = settings.rate;
+      let started = 0, gotBoundary = false;
+      u.onstart = () => {
+        started = performance.now();
+        mark(wordAt(piece.offset + (piece.text.length - piece.text.trimStart().length)));
+        // Some phone voices never report word positions: estimate them from time.
+        me.fallback = setTimeout(() => {
+          if (gotBoundary || session !== me) return;
+          const est = countWords(piece.text) / ((settings.base[lang] || DEFAULT_BASE[lang]) * u.rate) * 60000;
+          me.timer = setInterval(() => {
+            if (session !== me) return;
+            const frac = Math.min(1, (performance.now() - started) / est);
+            const idx = piece.offset + Math.floor(frac * piece.text.length);
+            me.last = idx; mark(wordAt(idx));
+          }, 90);
+        }, 700);
+      };
+      u.onboundary = e => {
+        if (session !== me || (e.name && e.name !== "word")) return;
+        gotBoundary = true; clearInterval(me.timer);
+        me.last = piece.offset + e.charIndex; mark(wordAt(me.last));
+      };
+      u.onend = () => {
+        if (session === me && started) learnBase(lang, countWords(piece.text), performance.now() - started, u.rate);
+        if (session === me) me.last = piece.offset + piece.text.length;
+        next();
+      };
+      u.onerror = e => {
+        if (session !== me) return;
+        if (e.error === "not-allowed") { setLang("Tap ▶ to start", true); stopSpeech(); doc.resumeAt = me.last; return; }
+        if (e.error !== "interrupted" && e.error !== "canceled") stopSpeech();
+      };
+      speechSynthesis.speak(u);
+    };
+    next();
+  }
+
+  function finish() {
+    if (!doc) return;
+    if (doc.cur >= 0) doc.words[doc.cur].el.classList.remove("on");
+    doc.words.forEach(w => w.el.classList.add("done"));
+    $("bar").style.width = "100%";
+    doc.resumeAt = null; doc.finished = true;
+  }
+
+  function setLang(text, warn) {
+    $("langText").textContent = text;
+    $("langbox").classList.toggle("warn", !!warn);
+  }
+
+  // ---------- screens ----------
+  function openReader(raw, autoplay) {
+    const text = clean(raw);
+    if (!text) return;
+    recent = [text, ...recent.filter(t => t !== text)].slice(0, 10);
+    store.set("recent", recent);
+    buildReader(text);
+    setLang(doc.lang === "he" ? "Hebrew" : "English");
+    $("compose").classList.add("hidden");
+    $("reader").classList.remove("hidden");
+    $("player").classList.remove("hidden");
+    setPlayingUI(false);
+    scrollTo(0, 0);
+    if (autoplay) play(0);
+  }
+  function closeReader() {
+    stopSpeech();
+    $("reader").classList.add("hidden");
+    $("player").classList.add("hidden");
+    $("compose").classList.remove("hidden");
+    renderRecent();
+    if (location.search) history.replaceState(null, "", location.pathname);
+  }
+  function renderRecent() {
+    $("recent").replaceChildren(...recent.map(t => {
+      const b = document.createElement("button");
+      b.textContent = t.replace(/\s+/g, " ").slice(0, 90);
+      b.onclick = () => openReader(t, true);
+      return b;
+    }));
+    $("recentTitle").classList.toggle("hidden", !recent.length);
+  }
+
+  $("playBtn").onclick = () => {
+    if (session) { pause(); return; }
+    if (doc.finished) { resetMarks(); doc.finished = false; play(0); return; }
+    play(doc.resumeAt ?? (doc.cur >= 0 ? doc.words[doc.cur].start : 0));
+  };
+  $("restartBtn").onclick = () => { resetMarks(); doc.finished = false; play(0); };
+  $("backBtn").onclick = closeReader;
+  $("readBtn").onclick = () => openReader($("input").value, true);
+  $("clearBtn").onclick = () => { $("input").value = ""; $("input").focus(); };
+  $("pasteBtn").onclick = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t && t.trim()) { $("input").value = t; openReader(t, true); }
+      else $("input").focus();
+    } catch { $("input").focus(); $("input").placeholder = "לחיצה ארוכה כאן ← הדבק, ואז הקרא"; }
+  };
+
+  // ---------- speed sheet ----------
+  const ticks = [0.5, 1, 2, 3, 4];
+  $("ticks").innerHTML = ticks.map(v => `<span style="left:${(v - RATE_MIN) / (RATE_MAX - RATE_MIN) * 100}%">${v}×</span>`).join("");
+  const rateForReader = (wpm, lang = "he") => clampRate(wpm / (settings.base[lang] || DEFAULT_BASE[lang]));
+  function syncSpeed() {
+    $("speedChip").textContent = $("speedChip2").textContent = $("rateVal").textContent = fmt(settings.rate);
+    $("rate").value = settings.rate;
+    $("readerInfo").textContent = settings.readerWpm
+      ? `מהירות הקריאה שלך: ${settings.readerWpm} מילים לדקה. מומלץ: ${fmt(rateForReader(settings.readerWpm))}.`
+      : "לא בטוח איזו מהירות מתאימה? מדוד כמה מהר אתה קורא.";
+  }
+  const openSheet = id => $(id).classList.remove("hidden");
+  const closeSheet = id => $(id).classList.add("hidden");
+  $("speedChip").onclick = $("speedChip2").onclick = () => { syncSpeed(); openSheet("speedSheet"); };
+  $("speedSheet").onclick = e => { if (e.target.id === "speedSheet") closeSheet("speedSheet"); };
+  let rateTimer = 0;
+  $("rate").oninput = e => {
+    settings.rate = clampRate(+e.target.value); syncSpeed();
+    clearTimeout(rateTimer);
+    rateTimer = setTimeout(() => { save(); if (session) play(session.last); }, 350);
+  };
+
+  // ---------- reading test ----------
+  const TEST_TEXT =
+    "בכל בוקר, כשהעיר עוד מתעוררת, הנמל כבר מלא בתנועה. מנופים ענקיים מרימים מכולות צבעוניות " +
+    "ומניחים אותן על משאיות שממתינות בתור. כל מכולה נושאת סיפור משלה: בגדים שנתפרו במדינה רחוקה, " +
+    "חלקי מכונות למפעל קטן, או פירות שצריכים להגיע לשוק לפני שיתקלקלו. מאחורי הקלעים עובדים אנשים " +
+    "רבים שדואגים שהכול יתנהל בזמן. הם בודקים מסמכים, עוקבים אחרי משלוחים במסכים, ומתאמים בין " +
+    "ספינות, נהגים ומחסנים. לפעמים מספיקה תקלה קטנה, כמו סערה בים או מסמך חסר, כדי לעכב משלוח שלם. " +
+    "לכן התכנון חשוב כל כך. מי שעובד בתחום לומד מהר שסבלנות ודיוק הולכים יד ביד, ושכל פרט קטן " +
+    "יכול לשנות את התמונה כולה. בסוף היום, כשהשמש שוקעת מעל המים, המכולות ממשיכות במסען אל יעדים חדשים.";
+  const TEST_WORDS = countWords(TEST_TEXT);
+  $("tPassage").textContent = TEST_TEXT;
+  let tStart = 0, tTimer = 0, tRes = null;
+  const tStep = s => ["tIntro", "tRead", "tResult"].forEach(x => $(x).classList.toggle("hidden", x !== s));
+  $("measureBtn").onclick = () => { closeSheet("speedSheet"); if (session) pause(); tStep("tIntro"); openSheet("testSheet"); };
+  document.querySelectorAll("[data-close]").forEach(b => (b.onclick = () => { clearInterval(tTimer); closeSheet("testSheet"); }));
+  $("tStart").onclick = () => {
+    tStep("tRead"); $("tPassage").scrollTop = 0; tStart = performance.now(); clearInterval(tTimer);
+    tTimer = setInterval(() => { const s = Math.floor((performance.now() - tStart) / 1000); $("tTimer").textContent = Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0"); }, 250);
+  };
+  $("tDone").onclick = () => {
+    clearInterval(tTimer);
+    const sec = (performance.now() - tStart) / 1000;
+    tStep("tResult");
+    if (sec < 6) { tRes = null; $("tWpm").textContent = "מהר מדי"; $("tText").textContent = "נראה שלא הספקת לקרוא את כל הקטע. נסה שוב."; $("tApply").classList.add("hidden"); return; }
+    const wpm = Math.round(TEST_WORDS / (sec / 60)), rate = rateForReader(wpm);
+    tRes = { wpm, rate };
+    $("tWpm").textContent = wpm + " מילים לדקה";
+    $("tText").textContent = `קראת ${TEST_WORDS} מילים ב-${Math.round(sec)} שניות. המהירות שמתאימה לך: ${fmt(rate)}${rate >= RATE_MAX ? " (המקסימום)" : ""}.`;
+    $("tApply").classList.remove("hidden");
+  };
+  $("tRetry").onclick = () => $("tStart").onclick();
+  $("tApply").onclick = () => { if (!tRes) return; settings.readerWpm = tRes.wpm; settings.rate = tRes.rate; save(); syncSpeed(); closeSheet("testSheet"); };
+
+  // ---------- start ----------
+  syncSpeed();
+  renderRecent();
+  const params = new URLSearchParams(location.search);
+  const shared = [params.get("text"), params.get("title")].find(v => v && v.trim());
+  if (shared) openReader(shared, true);    // if the phone blocks it, one tap on ▶ starts reading
+
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
